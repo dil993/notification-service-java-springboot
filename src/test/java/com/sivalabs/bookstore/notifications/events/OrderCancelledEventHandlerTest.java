@@ -1,29 +1,26 @@
 package com.sivalabs.bookstore.notifications.events;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.awaitility.Awaitility.await;
+import static org.mockito.Mockito.verify;
+
 import com.sivalabs.bookstore.notifications.ApplicationProperties;
 import com.sivalabs.bookstore.notifications.common.AbstractIntegrationTest;
-import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.kafka.core.KafkaTemplate;
-
-import java.util.Optional;
+import com.sivalabs.bookstore.notifications.events.model.Customer;
+import com.sivalabs.bookstore.notifications.events.model.OrderCancelledEvent;
 import java.util.UUID;
-
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.awaitility.Awaitility.await;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
+import lombok.extern.slf4j.Slf4j;
+import org.assertj.core.api.Assertions;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Slf4j
 class OrderCancelledEventHandlerTest extends AbstractIntegrationTest {
 
-    @Autowired
-    private KafkaTemplate<String,Object> kafkaTemplate;
+    @Autowired private KafkaHelper kafkaHelper;
 
-    @Autowired
-    private ApplicationProperties properties;
+    @Autowired private ApplicationProperties properties;
 
     @Test
     void shouldHandleOrderCancelledEvent() {
@@ -31,12 +28,20 @@ class OrderCancelledEventHandlerTest extends AbstractIntegrationTest {
         event.setOrderId(UUID.randomUUID().toString());
         event.setCustomer(new Customer());
         event.getCustomer().setName("Siva");
+        event.getCustomer().setEmail("siva@gmail.com");
         log.info("Cancelling OrderId:{}", event.getOrderId());
 
-        kafkaTemplate.send(properties.cancelledOrdersTopic(), event);
+        kafkaHelper.send(properties.cancelledOrdersTopic(), event);
 
-        await().atMost(30, SECONDS).untilAsserted(() -> {
-            verify(notificationService).sendCancelledNotification(any(OrderCancelledEvent.class));
-        });
+        ArgumentCaptor<OrderCancelledEvent> captor =
+                ArgumentCaptor.forClass(OrderCancelledEvent.class);
+        await().atMost(30, SECONDS)
+                .untilAsserted(
+                        () -> {
+                            verify(notificationService).sendCancelledNotification(captor.capture());
+                            OrderCancelledEvent orderCancelledEvent = captor.getValue();
+                            Assertions.assertThat(orderCancelledEvent.getOrderId())
+                                    .isEqualTo(event.getOrderId());
+                        });
     }
 }

@@ -1,4 +1,4 @@
-package com.sivalabs.bookstore.notifications.events;
+package com.sivalabs.bookstore.notifications.events.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
